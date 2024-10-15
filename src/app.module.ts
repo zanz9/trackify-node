@@ -3,6 +3,10 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { SeriesModule } from './series/series.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ParsingService } from './parsing/parsing.service';
+import { ParsingController } from './parsing/parsing.controller';
+import { ParsingModule } from './parsing/parsing.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -12,9 +16,11 @@ import { TypeOrmModule } from '@nestjs/typeorm';
       entities: [__dirname + '/**/*.entity{.ts,.js}'], // Автоподключение сущностей
       synchronize: true, // Автосинхронизация — использовать с осторожностью в продакшене
     }),
+    ScheduleModule.forRoot(),
     SeriesModule,
+    ParsingModule,
   ],
-  controllers: [AppController],
-  providers: [AppService],
+  controllers: [AppController, ParsingController],
+  providers: [AppService, ParsingService],
 })
 export class AppModule {}

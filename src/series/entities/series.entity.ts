@@ -1,4 +1,11 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  Entity,
+  ManyToOne,
+  OneToMany,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
+import { Episode } from './episode.entity';
 
 @Entity()
 export class Series {
@@ -21,5 +28,8 @@ export class Series {
   trailerUrl: string;
 
   @Column()
-  timeForNextEpisode: string;
+  genres: string;
+
+  @OneToMany(() => Episode, (episode) => episode.series)
+  episodes: Episode[];
 }

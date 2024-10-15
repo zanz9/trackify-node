@@ -8,8 +8,7 @@ import {
   Delete,
 } from '@nestjs/common';
 import { SeriesService } from './series.service';
-import { CreateSeriesDto } from './dto/create-series.dto';
-import { UpdateSeriesDto } from './dto/update-series.dto';
+import { SeriesDto } from './dto/series.dto';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 @ApiTags('series')
@@ -25,7 +24,7 @@ export class SeriesController {
   })
   @ApiResponse({ status: 400, description: 'Bad Request' })
   @ApiResponse({ status: 500, description: 'Internal Server Error' })
-  create(@Body() createSeriesDto: CreateSeriesDto) {
+  create(@Body() createSeriesDto: SeriesDto) {
     return this.seriesService.create(createSeriesDto);
   }
 
@@ -61,7 +60,7 @@ export class SeriesController {
   })
   @ApiResponse({ status: 404, description: 'Series not found' })
   @ApiResponse({ status: 500, description: 'Internal Server Error' })
-  update(@Param('id') id: string, @Body() updateSeriesDto: UpdateSeriesDto) {
+  update(@Param('id') id: string, @Body() updateSeriesDto: SeriesDto) {
     return this.seriesService.update(+id, updateSeriesDto);
   }
 
