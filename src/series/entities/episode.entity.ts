@@ -13,6 +13,9 @@ export class Episode {
   releaseDate: Date;
 
   @Column()
+  numberEpisode: number;
+
+  @Column()
   released: boolean;
 
   @ManyToOne(() => Series, (series) => series.episodes, { onDelete: 'CASCADE' })

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Scope } from '@nestjs/common';
 import * as cheerio from 'cheerio';
 import axios from 'axios';
 import Endpoints from 'src/endpoints/endpoints';
@@ -8,51 +8,73 @@ import { SeriesService } from 'src/series/series.service';
 import { SeriesDto } from 'src/series/dto/series.dto';
 import { Episode } from 'src/series/entities/episode.entity';
 import { EpisodeService } from 'src/series/episode.service';
+import { parse } from 'date-fns';
+import { ru } from 'date-fns/locale';
+import { log } from 'console';
+import { EpisodeDto } from 'src/series/dto/episode.dto';
 
-@Injectable()
+let isCronRunning = false;
+
+@Injectable({ scope: Scope.DEFAULT })
 export class ParsingService {
   constructor(
     private readonly seriesService: SeriesService,
     private readonly episodeService: EpisodeService,
   ) {}
 
-  @Cron('* 12 * * *')
+  @Cron('0 0 14 * * *', {
+    disabled: process.env.NODE_ENV === 'development',
+    timeZone: 'Asia/Almaty',
+  })
   async parseData(): Promise<void> {
+    if (isCronRunning) {
+      console.log('Cron is already running, skipping execution.');
+      return;
+    }
+
+    isCronRunning = true;
     console.log('service init');
-    const series = await this.parseHtmlFromUrl();
-    await Promise.all(
-      series.map(async (s) => {
-        const result = new SeriesDto();
-        result.name = s.series.name;
-        result.description = s.series.description;
-        result.releaseDate = s.series.releaseDate;
-        result.imageUrl = s.series.imageUrl;
-        result.trailerUrl = s.series.trailerUrl;
-        result.genres = s.series.genres;
 
-        const createdSeries = await this.seriesService.updateOrCreate(result);
-        console.log('createdSeries');
-        const episodes = s.episodes.map((e) => {
-          const episode = new Episode();
-          episode.title = e.title;
-          episode.releaseDate = e.releaseDate;
-          episode.released = e.released;
-          episode.series = createdSeries; // Привязываем к созданной серии
-          return episode;
-        });
+    try {
+      const series = await this.parseHtmlFromUrl();
+      await Promise.all(
+        series.map(async (s) => {
+          const result = new SeriesDto();
+          result.name = s.series.name;
+          result.description = s.series.description;
+          result.releaseDate = s.series.releaseDate;
+          result.imageUrl = s.series.imageUrl;
+          result.trailerUrl = s.series.trailerUrl;
+          result.genres = s.series.genres;
 
-        await Promise.all(
-          episodes.map((ep) => this.episodeService.updateOrCreate(ep)),
-        );
-        console.log('createdEpisodes');
-      }),
-    );
+          const createdSeries = await this.seriesService.updateOrCreate(result);
+          const episodes = s.episodes.map((e) => {
+            const episode = new Episode();
+            episode.title = e.title;
+            episode.releaseDate = e.releaseDate;
+            episode.released = e.released;
+            episode.series = createdSeries; // Привязываем к созданной серии
+            episode.numberEpisode = e.numberEpisode;
+            return episode;
+          });
+
+          await Promise.all(
+            episodes.map((ep) => this.episodeService.updateOrCreate(ep)),
+          );
+        }),
+      );
+    } catch (error) {
+      console.error('Error during cron execution:', error);
+    } finally {
+      isCronRunning = false;
+      console.log('service end');
+    }
   }
 
   async parseHtmlFromUrl(): Promise<
     {
       series: Series;
-      episodes: { title: string; releaseDate: Date; released: boolean }[];
+      episodes: EpisodeDto[];
     }[]
   > {
     const { data } = await axios.get(Endpoints.BASE_URL + Endpoints.RASPISANIE);
@@ -65,6 +87,8 @@ export class ParsingService {
       hrefs.push(href);
     });
 
+    console.log(`Всего ссылок: ${hrefs.length}`);
+
     const promises = hrefs.map(async (href) => {
       const { data: data2 } = await axios.get(Endpoints.BASE_URL + href);
       const $2 = cheerio.load(data2, { scriptingEnabled: true });
@@ -75,11 +99,15 @@ export class ParsingService {
       const letter1Element = $2('#rasp .letter1');
       if (letter1Element.length === 0 || letter1Element.length < 4) return null;
 
-      const releaseDate = $2(letter1Element)
+      const tempReleaseDate = $2(letter1Element)
         .first()
         .children('td')
         .last()
         .text();
+      const releaseDate = parse(tempReleaseDate, 'd MMMM yyyy', new Date(), {
+        locale: ru,
+      });
+
       const genres = $2(letter1Element).last().children('td').last().text();
 
       const iframeHtml = $2('.entry-content noscript').last().text();
@@ -95,21 +123,26 @@ export class ParsingService {
       const imageUrl = iframeImg('img').attr('src');
 
       const episodes = $2('#rasp>tbody').last().children('tr');
-      const episodesArray: {
-        title: string;
-        releaseDate: Date;
-        released: boolean;
-      }[] = [];
+      const episodesArray: EpisodeDto[] = [];
       episodes.each((i, element) => {
         var released = false;
         if ($2(element).hasClass('gotov')) {
           released = true;
         }
-        const title = $2(element).children('td').first().text();
-        const releaseDate = $2(element).children('td').last().text();
+        const titleEpisode = $2(element).children('td').first().text();
+        const tempReleaseDate = $2(element)
+          .children('td')
+          .last()
+          .text()
+          .replace(/\s+/g, ' ')
+          .trim(); // 10 октября 2024
+        const releaseDate = parse(tempReleaseDate, 'd MMMM yyyy', new Date(), {
+          locale: ru,
+        });
         episodesArray.push({
-          title,
-          releaseDate: new Date(releaseDate),
+          numberEpisode: i,
+          title: titleEpisode,
+          releaseDate: releaseDate,
           released,
         });
       });
@@ -128,6 +161,8 @@ export class ParsingService {
     const objects = (await Promise.all(promises)).filter(
       (item) => item !== null,
     );
+
+    console.log(`Всего серий: ${objects.length}`);
 
     return objects;
   }

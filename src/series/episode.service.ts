@@ -10,10 +10,10 @@ export class EpisodeService {
     @InjectRepository(Episode) private episodeRepository: Repository<Episode>,
   ) {}
 
-  async updateOrCreate(episode: EpisodeDto) {
+  async updateOrCreate(episode: Episode) {
     const result = await this.episodeRepository.findOneBy({
-      title: episode.title,
-      releaseDate: episode.releaseDate,
+      series: episode.series,
+      numberEpisode: episode.numberEpisode,
     });
     if (result == null) {
       return await this.episodeRepository.save(episode);

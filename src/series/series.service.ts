@@ -16,13 +16,17 @@ export class SeriesService {
 
   findAll() {
     return this.seriesRepository.find({
-      order: { id: 'ASC' },
+      order: { id: 'ASC', episodes: { numberEpisode: 'ASC' } },
       relations: ['episodes'],
     });
   }
 
   findOne(id: number) {
-    return this.seriesRepository.findOneBy({ id });
+    return this.seriesRepository.findOne({
+      where: { id },
+      relations: ['episodes'],
+      order: { episodes: { numberEpisode: 'ASC' } },
+    });
   }
 
   findByName(name: string) {
