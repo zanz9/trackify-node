@@ -30,7 +30,11 @@ export class SeriesService {
   }
 
   findByName(name: string) {
-    return this.seriesRepository.findOneBy({ name });
+    return this.seriesRepository.findOne({
+      where: { name },
+      relations: ['episodes'],
+      order: { episodes: { numberEpisode: 'ASC' } },
+    });
   }
 
   update(id: number, updateSeriesDto: SeriesDto) {

@@ -7,6 +7,7 @@ import { ParsingService } from './parsing/parsing.service';
 import { ParsingController } from './parsing/parsing.controller';
 import { ParsingModule } from './parsing/parsing.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { TelegramModule } from './telegram/telegram.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     ScheduleModule.forRoot(),
     SeriesModule,
     ParsingModule,
+    TelegramModule,
   ],
   controllers: [AppController, ParsingController],
   providers: [AppService, ParsingService],
