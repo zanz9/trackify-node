@@ -34,19 +34,19 @@ export class EpisodeService {
     return await this.episodeRepository.findOneBy({ id: result.id });
   }
 
-  async update(id: number, episode: EpisodeDto) {
+  async update(id: number, released: boolean) {
     const result = await this.episodeRepository.findOne({
       where: { id },
       relations: ['series'],
     });
-    if (result.released != episode.released) {
-      console.log(result);
+    if (result.released != released) {
+      console.log('telegram');
       await this.telegramService.sendMessage(
         `Сериал: ${result.series.name} 
 Эпизод: ${result.title}
-Статус: ${episode.released ? 'Вышел' : 'Не вышел'}`,
+Статус: ${released ? 'Вышел' : 'Не вышел'}`,
       );
     }
-    return await this.episodeRepository.update(id, episode);
+    return await this.episodeRepository.update(id, { released });
   }
 }

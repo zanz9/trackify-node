@@ -14,11 +14,23 @@ export class SeriesService {
     return this.seriesRepository.save(createSeriesDto);
   }
 
-  findAll() {
-    return this.seriesRepository.find({
-      order: { id: 'ASC', episodes: { numberEpisode: 'ASC' } },
-      relations: ['episodes'],
+  async findAll(page: number, limit: number) {
+    const [series, total] = await this.seriesRepository
+      .createQueryBuilder('series')
+      .leftJoinAndSelect('series.episodes', 'episodes')
+      .orderBy('series.id', 'ASC')
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    series.forEach((serial) => {
+      serial.episodes.sort((a, b) => a.numberEpisode - b.numberEpisode);
     });
+
+    return {
+      data: series,
+      count: total,
+    };
   }
 
   findOne(id: number) {

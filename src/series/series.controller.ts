@@ -6,27 +6,16 @@ import {
   Patch,
   Param,
   Delete,
+  Query,
 } from '@nestjs/common';
 import { SeriesService } from './series.service';
 import { SeriesDto } from './dto/series.dto';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 @ApiTags('series')
 @Controller('series')
 export class SeriesController {
   constructor(private readonly seriesService: SeriesService) {}
-
-  @Post()
-  @ApiOperation({ summary: 'Create a new series' })
-  @ApiResponse({
-    status: 201,
-    description: 'The series has been successfully created.',
-  })
-  @ApiResponse({ status: 400, description: 'Bad Request' })
-  @ApiResponse({ status: 500, description: 'Internal Server Error' })
-  create(@Body() createSeriesDto: SeriesDto) {
-    return this.seriesService.create(createSeriesDto);
-  }
 
   @Get()
   @ApiOperation({ summary: 'Get all series' })
@@ -36,8 +25,13 @@ export class SeriesController {
   })
   @ApiResponse({ status: 404, description: 'Series not found' })
   @ApiResponse({ status: 500, description: 'Internal Server Error' })
-  findAll() {
-    return this.seriesService.findAll();
+  @ApiQuery({ name: 'page', type: Number, required: false })
+  @ApiQuery({ name: 'limit', type: Number, required: false })
+  findAll(@Query('page') page: number, @Query('limit') limit: number) {
+    page = page || 1;
+    limit = limit || 10;
+    console.log(page, limit);
+    return this.seriesService.findAll(page, limit);
   }
 
   @Get(':id')
@@ -50,29 +44,5 @@ export class SeriesController {
   @ApiResponse({ status: 500, description: 'Internal Server Error' })
   findOne(@Param('id') id: string) {
     return this.seriesService.findOne(+id);
-  }
-
-  @Patch(':id')
-  @ApiOperation({ summary: 'Update a series by ID' })
-  @ApiResponse({
-    status: 200,
-    description: 'The series has been successfully updated.',
-  })
-  @ApiResponse({ status: 404, description: 'Series not found' })
-  @ApiResponse({ status: 500, description: 'Internal Server Error' })
-  update(@Param('id') id: string, @Body() updateSeriesDto: SeriesDto) {
-    return this.seriesService.update(+id, updateSeriesDto);
-  }
-
-  @Delete(':id')
-  @ApiOperation({ summary: 'Delete a series by ID' })
-  @ApiResponse({
-    status: 200,
-    description: 'The series has been successfully deleted.',
-  })
-  @ApiResponse({ status: 404, description: 'Series not found' })
-  @ApiResponse({ status: 500, description: 'Internal Server Error' })
-  remove(@Param('id') id: string) {
-    return this.seriesService.remove(+id);
   }
 }

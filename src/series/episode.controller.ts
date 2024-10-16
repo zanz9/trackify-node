@@ -10,7 +10,7 @@ export class EpisodeController {
   constructor(private readonly episodeService: EpisodeService) {}
 
   @Patch(':id')
-  updateOrCreate(@Param('id') id: string, @Body() episode: EpisodeDto) {
-    return this.episodeService.update(+id, episode);
+  updateOrCreate(@Param('id') id: string, @Body() released: boolean) {
+    return this.episodeService.update(+id, released);
   }
 }
