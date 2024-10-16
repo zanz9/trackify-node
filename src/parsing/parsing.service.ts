@@ -22,7 +22,35 @@ export class ParsingService {
     private readonly episodeService: EpisodeService,
   ) {}
 
-  @Cron('0 0 14 * * *', {
+  async parseOne(href: string) {
+    const data = await this.parseOneSeriesHtml(href);
+    const result = new SeriesDto();
+    result.name = data.series.name;
+    result.description = data.series.description;
+    result.releaseDate = data.series.releaseDate;
+    result.imageUrl = data.series.imageUrl;
+    result.trailerUrl = data.series.trailerUrl;
+    result.genres = data.series.genres;
+    result.href = data.series.href;
+
+    const createdSeries = await this.seriesService.updateOrCreate(result);
+    const episodes = data.episodes.map((e) => {
+      const episode = new Episode();
+      episode.title = e.title;
+      episode.releaseDate = e.releaseDate;
+      episode.released = e.released;
+      episode.series = createdSeries;
+      episode.numberEpisode = e.numberEpisode;
+      return episode;
+    });
+    await Promise.all(
+      episodes.map((ep) => this.episodeService.updateOrCreate(ep)),
+    );
+
+    return this.seriesService.findOne(createdSeries.id);
+  }
+
+  @Cron('0 0 */6 * * *', {
     disabled: process.env.NODE_ENV === 'development',
     timeZone: 'Asia/Almaty',
   })
@@ -46,6 +74,7 @@ export class ParsingService {
           result.imageUrl = s.series.imageUrl;
           result.trailerUrl = s.series.trailerUrl;
           result.genres = s.series.genres;
+          result.href = s.series.href;
 
           const createdSeries = await this.seriesService.updateOrCreate(result);
           const episodes = s.episodes.map((e) => {
@@ -80,7 +109,6 @@ export class ParsingService {
     const { data } = await axios.get(Endpoints.BASE_URL + Endpoints.RASPISANIE);
     const $ = cheerio.load(data);
     const hrefs: string[] = [];
-
     $('.letter>td>a').each((i, element) => {
       var href = $(element).attr('href');
       if (hrefs.includes(href)) return;
@@ -88,82 +116,83 @@ export class ParsingService {
     });
 
     console.log(`Всего ссылок: ${hrefs.length}`);
-
     const promises = hrefs.map(async (href) => {
-      const { data: data2 } = await axios.get(Endpoints.BASE_URL + href);
-      const $2 = cheerio.load(data2, { scriptingEnabled: true });
-      const titleElement = $2('#rasp .zagol').children('th')[1];
-      const title = $2(titleElement).text();
-      if (title === '') return null;
-
-      const letter1Element = $2('#rasp .letter1');
-      if (letter1Element.length === 0 || letter1Element.length < 4) return null;
-
-      const tempReleaseDate = $2(letter1Element)
-        .first()
-        .children('td')
-        .last()
-        .text();
-      const releaseDate = parse(tempReleaseDate, 'd MMMM yyyy', new Date(), {
-        locale: ru,
-      });
-
-      const genres = $2(letter1Element).last().children('td').last().text();
-
-      const iframeHtml = $2('.entry-content noscript').last().text();
-      const iframe = cheerio.load(iframeHtml);
-      const trailerUrl = iframe('iframe').attr('src');
-
-      const iframeHtmlImg = $2('img.aligncenter')
-        .first()
-        .parent()
-        .children('noscript')
-        .text();
-      const iframeImg = cheerio.load(iframeHtmlImg);
-      const imageUrl = iframeImg('img').attr('src');
-
-      const episodes = $2('#rasp>tbody').last().children('tr');
-      const episodesArray: EpisodeDto[] = [];
-      episodes.each((i, element) => {
-        var released = false;
-        if ($2(element).hasClass('gotov')) {
-          released = true;
-        }
-        const titleEpisode = $2(element).children('td').first().text();
-        const tempReleaseDate = $2(element)
-          .children('td')
-          .last()
-          .text()
-          .replace(/\s+/g, ' ')
-          .trim(); // 10 октября 2024
-        const releaseDate = parse(tempReleaseDate, 'd MMMM yyyy', new Date(), {
-          locale: ru,
-        });
-        episodesArray.push({
-          numberEpisode: i,
-          title: titleEpisode,
-          releaseDate: releaseDate,
-          released,
-        });
-      });
-
-      const series = new Series();
-      series.name = title;
-      series.releaseDate = new Date(releaseDate);
-      series.genres = genres;
-      series.trailerUrl = trailerUrl;
-      series.imageUrl = imageUrl;
-      series.description = '';
-
-      return { series, episodes: episodesArray };
+      return await this.parseOneSeriesHtml(href);
     });
-
     const objects = (await Promise.all(promises)).filter(
       (item) => item !== null,
     );
-
     console.log(`Всего серий: ${objects.length}`);
-
     return objects;
+  }
+
+  async parseOneSeriesHtml(href: string) {
+    const { data: data2 } = await axios.get(Endpoints.BASE_URL + href);
+    const $2 = cheerio.load(data2, { scriptingEnabled: true });
+    const titleElement = $2('#rasp .zagol').children('th')[1];
+    const title = $2(titleElement).text();
+    if (title === '') return null;
+
+    const letter1Element = $2('#rasp .letter1');
+    if (letter1Element.length === 0 || letter1Element.length < 4) return null;
+
+    const tempReleaseDate = $2(letter1Element)
+      .first()
+      .children('td')
+      .last()
+      .text();
+    const releaseDate = parse(tempReleaseDate, 'd MMMM yyyy', new Date(), {
+      locale: ru,
+    });
+
+    const genres = $2(letter1Element).last().children('td').last().text();
+
+    const iframeHtml = $2('.entry-content noscript').last().text();
+    const iframe = cheerio.load(iframeHtml);
+    const trailerUrl = iframe('iframe').attr('src');
+
+    const iframeHtmlImg = $2('img.aligncenter')
+      .first()
+      .parent()
+      .children('noscript')
+      .text();
+    const iframeImg = cheerio.load(iframeHtmlImg);
+    const imageUrl = iframeImg('img').attr('src');
+
+    const episodes = $2('#rasp>tbody').last().children('tr');
+    const episodesArray: EpisodeDto[] = [];
+    episodes.each((i, element) => {
+      var released = false;
+      if ($2(element).hasClass('gotov')) {
+        released = true;
+      }
+      const titleEpisode = $2(element).children('td').first().text();
+      const tempReleaseDate = $2(element)
+        .children('td')
+        .last()
+        .text()
+        .replace(/\s+/g, ' ')
+        .trim();
+      const releaseDate = parse(tempReleaseDate, 'd MMMM yyyy', new Date(), {
+        locale: ru,
+      });
+      episodesArray.push({
+        numberEpisode: i,
+        title: titleEpisode,
+        releaseDate: releaseDate,
+        released,
+      });
+    });
+
+    const series = new Series();
+    series.name = title;
+    series.releaseDate = new Date(releaseDate);
+    series.genres = genres;
+    series.trailerUrl = trailerUrl;
+    series.imageUrl = imageUrl;
+    series.description = '';
+    series.href = href;
+
+    return { series, episodes: episodesArray };
   }
 }

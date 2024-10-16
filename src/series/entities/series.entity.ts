@@ -32,4 +32,7 @@ export class Series {
 
   @OneToMany(() => Episode, (episode) => episode.series)
   episodes: Episode[];
+
+  @Column()
+  href: string;
 }

@@ -40,7 +40,7 @@ export class SeriesDto {
   trailerUrl: string;
 
   @ApiProperty({
-    example: 'genres',
+    example: 'Drama, Crime, Thriller',
     description: 'The trailer genres of the series',
     type: String,
   })
@@ -52,4 +52,11 @@ export class SeriesDto {
     type: [EpisodeDto],
   })
   episodes: EpisodeDto[];
+
+  @ApiProperty({
+    example: 'https://www.google.com',
+    description: 'The href of the series',
+    type: String,
+  })
+  href: string;
 }
